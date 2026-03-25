@@ -9,7 +9,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
-# 🎯 Cập nhật URL chuẩn do anh Hoàn cung cấp
 URL_DANG_NHAP = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf"
 URL_BANG_DU_LIEU = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf/Default?OpenForm&tab=subMenuTheodoi&donvi="
 
@@ -35,7 +34,7 @@ def gui_anh_telegram(photo_path: str, caption_text: str):
         return False
 
 def chay_robot_chup_man_hinh():
-    log.info("--- BẮT ĐẦU CHẠY ROBOT V4.3 (CHỤP CHUẨN ĐƠN VỊ) ---")
+    log.info("--- BẮT ĐẦU CHẠY ROBOT V4.4 (KÉO DÀI CỬA SỔ CHỤP HẾT VIỆC) ---")
     driver = None
     ngay_hom_nay = datetime.now() + timedelta(hours=7)
     thoi_gian_hien_tai = ngay_hom_nay.strftime('%H:%M %d/%m/%Y')
@@ -45,12 +44,11 @@ def chay_robot_chup_man_hinh():
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1400,900") # Căn chỉnh tỷ lệ cửa sổ vừa khít bảng cho chữ to rõ
+        options.add_argument("--window-size=1400,1300") # 🎯 NÂNG CHIỀU CAO LÊN 1300 ĐỂ CHỤP HẾT CÁC VĂN BẢN PHÍA DƯỚI
         options.add_argument('--ignore-certificate-errors')
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-        # 🚀 Bước 1: Đăng nhập
         driver.get(URL_DANG_NHAP)
         time.sleep(10)
 
@@ -72,29 +70,16 @@ def chay_robot_chup_man_hinh():
         except:
             driver.execute_script("document.forms[0].submit()")
         
-        log.info("⏳ Đang đăng nhập...")
         time.sleep(15)
 
-        # 🚀 Bước 2: Nhảy thẳng vào URL chứa bảng của Đơn vị
-        log.info("🚀 Nhảy vào đúng Tab công việc của đơn vị...")
         driver.get(URL_BANG_DU_LIEU)
-        
-        log.info("⏳ Nằm im chờ 25 giây cho bảng load ra...")
         time.sleep(25) 
 
-        # 🚀 Bước 3: Chụp màn hình
-        log.info("📸 Bắt đầu chụp màn hình...")
         ten_anh = "man_hinh_nhiem_vu.png"
         driver.save_screenshot(ten_anh)
 
-        # 🚀 Bước 4: Gửi Telegram
         caption = f"📸 <b>BẢN TIN CHỤP TAB THEO DÕI NHIỆM VỤ</b>\n📅 <i>Cập nhật: {thoi_gian_hien_tai}</i>"
         thanh_cong = gui_anh_telegram(ten_anh, caption)
-
-        if thanh_cong:
-            log.info("✅ Đã bắn ảnh chụp màn hình lên Telegram!")
-        else:
-            log.info("❌ Chụp được ảnh nhưng gửi lên Telegram thất bại.")
 
         if os.path.exists(ten_anh):
             os.remove(ten_anh)
