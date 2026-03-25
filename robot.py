@@ -34,7 +34,7 @@ def gui_telegram(msg: str) -> bool:
         return False
 
 def chay_robot_nhac_viec():
-    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.2 (QUÉT LẶP LIÊN TỤC) ---")
+    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.3 (NÂNG CẤP ĐĂNG NHẬP) ---")
     driver = None
     ngay_hom_nay = datetime.now() + timedelta(hours=7)
 
@@ -45,31 +45,41 @@ def chay_robot_nhac_viec():
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
         options.add_argument('--ignore-certificate-errors')
+        options.add_argument("--disable-blink-features=AutomationControlled")
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         wait = WebDriverWait(driver, 30)
 
         # 🚀 Bước 1: Đăng nhập
         driver.get(URL_HE_THONG)
-        time.sleep(5)
+        time.sleep(10) # Cho web 10 giây để tải xong hoàn toàn bảng đăng nhập
 
-        wait.until(EC.presence_of_element_located((By.XPATH, "//input[contains(@name, 'Username') or contains(@name, 'username') or @type='text']")))
-        
+        # Tìm chính xác ô input kiểu text và kiểu password để điền
         inputs = driver.find_elements(By.TAG_NAME, "input")
+        
         for inp in inputs:
-            type_attr = inp.get_attribute("type")
-            if type_attr == "text":
-                inp.send_keys(USER_NAME)
-            elif type_attr == "password":
-                inp.send_keys(PASS_WORD)
+            try:
+                type_attr = inp.get_attribute("type")
+                if type_attr == "text" and inp.is_displayed():
+                    # Dùng JavaScript điền thẳng vào để tránh lỗi che khuất
+                    driver.execute_script("arguments[0].value = arguments[1];", inp, USER_NAME)
+                elif type_attr == "password" and inp.is_displayed():
+                    driver.execute_script("arguments[0].value = arguments[1];", inp, PASS_WORD)
+            except:
+                continue
 
+        time.sleep(2)
+
+        # Bấm nút đăng nhập bằng JavaScript (bao đâm thủng mọi rào cản che khuất)
         try:
-            driver.find_element(By.XPATH, "//input[@type='submit' or @value='Đăng nhập']").click()
-        except Exception:
+            nut_login = driver.find_element(By.XPATH, "//input[@type='submit' or @value='Đăng nhập']")
+            driver.execute_script("arguments[0].click();", nut_login)
+        except:
             driver.execute_script("document.forms[0].submit()")
-        time.sleep(15)
+            
+        time.sleep(15) # Đợi hệ thống xử lý đăng nhập và chuyển trang
 
-        # 🚀 Bước 2: Chuyển sang bảng Theo dõi nhiệm vụ
+        # 🚀 Bước 2: Quét bảng dữ liệu theo dõi
         driver.get(URL_HE_THONG)
         time.sleep(15)
 
@@ -96,8 +106,7 @@ def chay_robot_nhac_viec():
             if len(cells) < 8:
                 continue
 
-            stt = cells[0].text.strip()
-            # Bốc tách nội dung, hạn xử lý và trạng thái từ bảng
+            # Đoán cột dựa trên giao diện chuẩn
             noi_dung_nhiem_vu = cells[max(0, min(len(cells)-1, 4))].text.strip()
             thoi_han = cells[max(0, min(len(cells)-1, 7))].text.strip()
             trang_thai = cells[max(0, min(len(cells)-1, 8))].text.strip()
@@ -114,7 +123,7 @@ def chay_robot_nhac_viec():
             gui_telegram(noi_dung_bao_cao)
             log.info("✅ Đã gửi báo cáo danh sách nhiệm vụ tồn đọng qua Telegram!")
         else:
-            gui_telegram(f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')}\n\n🎉 Tuyệt vời! Hiện tại không có nhiệm vụ nào tồn đọng.")
+            gui_telegram(f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')} \n\n🎉 Tuyệt vời! Hiện tại không có nhiệm vụ nào tồn đọng.")
             log.info("✅ Không có nhiệm vụ tồn đọng.")
 
     except Exception as e:
