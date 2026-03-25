@@ -1,9 +1,10 @@
-name: Robot Nhắc Việc UBND Tỉnh
+name: Robot Chụp Màn Hình Nhiệm Vụ
 
 on:
   schedule:
-    - cron: '0 1 * * 1-5' # Chạy lúc 8:00 sáng từ Thứ 2 đến Thứ 6 (Giờ Việt Nam)
-  workflow_dispatch: # Nút bấm chạy bằng tay bất cứ lúc nào
+    - cron: '30 4 * * *' # Chạy lúc 11:30 Trưa giờ Việt Nam (Tất cả các ngày trong tuần)
+    - cron: '30 9 * * *' # Chạy lúc 16:30 Chiều giờ Việt Nam (Tất cả các ngày trong tuần)
+  workflow_dispatch: # Nút bấm chạy bằng tay
 
 jobs:
   run-robot:
