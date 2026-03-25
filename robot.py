@@ -9,9 +9,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Cấu hình hệ thống
+# 🎯 Cập nhật URL chuẩn do anh Hoàn cung cấp
 URL_DANG_NHAP = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf"
-URL_BANG_DU_LIEU = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf/Default?OpenForm&tab=subMenuTheoDoi"
+URL_BANG_DU_LIEU = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf/Default?OpenForm&tab=subMenuTheodoi&donvi="
 
 USER_NAME        = os.environ.get("SKHCN_USER", "")
 PASS_WORD        = os.environ.get("SKHCN_PASS", "")
@@ -28,14 +28,14 @@ def gui_anh_telegram(photo_path: str, caption_text: str):
         with open(photo_path, 'rb') as photo:
             files = {'photo': photo}
             data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption_text, 'parse_mode': 'HTML'}
-            resp = requests.post(url, files=files, data=data, timeout=30)
+            resp = requests.post(url, files=files, data=data, timeout=40)
         return resp.status_code == 200
     except Exception as e:
         log.error(f"Lỗi gửi ảnh Telegram: {e}")
         return False
 
 def chay_robot_chup_man_hinh():
-    log.info("--- BẮT ĐẦU CHẠY ROBOT V4.0 (CHỤP MÀN HÌNH) ---")
+    log.info("--- BẮT ĐẦU CHẠY ROBOT V4.3 (CHỤP CHUẨN ĐƠN VỊ) ---")
     driver = None
     ngay_hom_nay = datetime.now() + timedelta(hours=7)
     thoi_gian_hien_tai = ngay_hom_nay.strftime('%H:%M %d/%m/%Y')
@@ -45,14 +45,14 @@ def chay_robot_chup_man_hinh():
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1600,1200") # Cửa sổ to rõ nét
+        options.add_argument("--window-size=1400,900") # Căn chỉnh tỷ lệ cửa sổ vừa khít bảng cho chữ to rõ
         options.add_argument('--ignore-certificate-errors')
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-        # 🚀 Bước 1: Mở trang và Đăng nhập
+        # 🚀 Bước 1: Đăng nhập
         driver.get(URL_DANG_NHAP)
-        time.sleep(8)
+        time.sleep(10)
 
         inputs = driver.find_elements(By.TAG_NAME, "input")
         for inp in inputs:
@@ -71,19 +71,24 @@ def chay_robot_chup_man_hinh():
             driver.execute_script("arguments[0].click();", nut_login)
         except:
             driver.execute_script("document.forms[0].submit()")
-        time.sleep(12) # Đợi hệ thống đăng nhập
+        
+        log.info("⏳ Đang đăng nhập...")
+        time.sleep(15)
 
-        # 🚀 Bước 2: Nhảy thẳng vào URL chứa bảng Nhiệm vụ
+        # 🚀 Bước 2: Nhảy thẳng vào URL chứa bảng của Đơn vị
+        log.info("🚀 Nhảy vào đúng Tab công việc của đơn vị...")
         driver.get(URL_BANG_DU_LIEU)
-        time.sleep(15) # Chờ 15 giây cho bảng dữ liệu load ra đầy đủ
+        
+        log.info("⏳ Nằm im chờ 25 giây cho bảng load ra...")
+        time.sleep(25) 
 
-        # 🚀 Bước 3: Chụp màn hình và Lưu lại
+        # 🚀 Bước 3: Chụp màn hình
+        log.info("📸 Bắt đầu chụp màn hình...")
         ten_anh = "man_hinh_nhiem_vu.png"
         driver.save_screenshot(ten_anh)
-        log.info("✅ Đã chụp màn hình thành công!")
 
-        # 🚀 Bước 4: Nổ súng bắn ảnh về Telegram
-        caption = f"📸 <b>ẢNH CHỤP MÀN HÌNH NHIỆM VỤ</b>\n📅 <i>Cập nhật lúc: {thoi_gian_hien_tai}</i>"
+        # 🚀 Bước 4: Gửi Telegram
+        caption = f"📸 <b>BẢN TIN CHỤP TAB THEO DÕI NHIỆM VỤ</b>\n📅 <i>Cập nhật: {thoi_gian_hien_tai}</i>"
         thanh_cong = gui_anh_telegram(ten_anh, caption)
 
         if thanh_cong:
@@ -91,7 +96,6 @@ def chay_robot_chup_man_hinh():
         else:
             log.info("❌ Chụp được ảnh nhưng gửi lên Telegram thất bại.")
 
-        # Dọn dẹp file ảnh sau khi gửi xong
         if os.path.exists(ten_anh):
             os.remove(ten_anh)
 
