@@ -7,8 +7,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 URL_DANG_NHAP = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf"
@@ -32,7 +30,7 @@ def gui_telegram(msg: str) -> bool:
         return False
 
 def chay_robot_nhac_viec():
-    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.6 ---")
+    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.7 ---")
     driver = None
     ngay_hom_nay = datetime.now() + timedelta(hours=7)
 
@@ -45,7 +43,6 @@ def chay_robot_nhac_viec():
         options.add_argument('--ignore-certificate-errors')
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        wait = WebDriverWait(driver, 45) # Tăng thời gian chờ lên 45 giây cho chắc cú
 
         # 🚀 Bước 1: Đăng nhập
         driver.get(URL_DANG_NHAP)
@@ -72,7 +69,7 @@ def chay_robot_nhac_viec():
 
         # 🚀 Bước 2: Nhảy thẳng vào URL chứa bảng dữ liệu
         driver.get(URL_BANG_DU_LIEU)
-        time.sleep(20) # Chờ load bảng lâu hơn chút
+        time.sleep(20) # Thả lỏng cho mạng tỉnh load tẹt ga 20 giây
 
         driver.switch_to.default_content()
         frames = driver.find_elements(By.TAG_NAME, "frame") or driver.find_elements(By.TAG_NAME, "iframe")
@@ -85,47 +82,49 @@ def chay_robot_nhac_viec():
                     log.info(f"Đã nhảy vào frame: {f_name}")
                     break
 
-        # Đợi các hàng của bảng xuất hiện
-        wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "tr")))
-        rows = driver.find_elements(By.TAG_NAME, "tr")
+        # 💥 CHIÊU MỚI: Quét tất cả thẻ <tr> chứa chữ "chưa thực hiện" (không đợi Selenium đếm nữa!)
+        hàng_tìm_được = driver.find_elements(By.XPATH, "//tr[contains(translate(., 'CHƯA THỰC HIỆN', 'chưa thực hiện'), 'chưa thực hiện')]")
 
-        log.info(f"📋 Tìm thấy {len(rows)} hàng. Bắt đầu phân tích...")
-        
+        log.info(f"📋 Quét nhanh phát hiện thấy {len(hàng_tìm_được)} việc có trạng thái Chưa thực hiện!")
+
         co_viec_ton = False
         noi_dung_bao_cao = f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 <i>Cập nhật: {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')}</i>\n\n"
 
-        for row in rows:
+        for row in hàng_tìm_được:
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
-                if len(cells) < 9:
+                if len(cells) < 5:
                     continue
 
-                noi_dung = cells[4].text.strip() # Cột 5
-                thoi_han = cells[7].text.strip() # Cột 8
-                trang_thai = cells[8].text.strip() # Cột 9
+                noi_dung = cells[4].text.strip() # Nội dung (Cột 5)
+                
+                # Tìm thời hạn ở cột 8 (Nếu không bốc được thì lấy tạm chuỗi rỗng)
+                thoi_han = "Không rõ"
+                if len(cells) >= 8:
+                    thoi_han = cells[7].text.strip()
 
-                if "chưa thực hiện" in trang_thai.lower() and noi_dung:
+                if noi_dung:
                     co_viec_ton = True
-                    tieude_rut_gon = noi_dung.split('\n')[0][:120]
-                    
+                    rut_gon = noi_dung.split('\n')[0][:150]
                     noi_dung_bao_cao += (
-                        f"📌 <b>Việc:</b> {tieude_rut_gon}...\n"
+                        f"📌 <b>Việc:</b> {rut_gon}...\n"
                         f"⏳ <b>Hạn:</b> 🔴 {thoi_han}\n"
-                        f"🚦 <b>TT:</b> {trang_thai}\n"
                         f"─────────────────\n"
                     )
             except:
-                continue # Nếu hàng lỗi thì bỏ qua đọc hàng tiếp theo
+                continue
 
         if co_viec_ton:
             gui_telegram(noi_dung_bao_cao)
-            log.info("✅ Bắn báo cáo thành công!")
+            log.info("✅ Bắn báo cáo thành công lên Telegram!")
         else:
-            gui_telegram(f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')}\n\n🎉 Quét xong! Không phát hiện nhiệm vụ nào tồn đọng.")
+            # Gửi thử một tin Debug nhẹ nếu nó bảo không có gì
+            mau_html = driver.page_source[:200]
+            gui_telegram(f"🤖 Robot V3.7 hoàn tất quét. Không bốc được việc. (Dấu vết web: <code>{mau_html}</code>)")
 
     except Exception as e:
         log.error(f"❌ Lỗi: {e}")
-        gui_telegram(f"❌ Robot V3.6 bị lỗi kỹ thuật: {e}")
+        gui_telegram(f"❌ Robot V3.7 báo lỗi: {e}")
     finally:
         if driver:
             driver.quit()
