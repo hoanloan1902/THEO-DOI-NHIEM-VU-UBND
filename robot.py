@@ -11,7 +11,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-URL_HE_THONG = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf"
+# Link trang đăng nhập và link bảng dữ liệu chuẩn xác
+URL_DANG_NHAP = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf"
+URL_BANG_DU_LIEU = "https://cddh.dienbien.gov.vn/qlvb/vbcddh.nsf/Default?OpenForm&tab=subMenuTheoDoi"
 
 USER_NAME        = os.environ.get("SKHCN_USER", "")
 PASS_WORD        = os.environ.get("SKHCN_PASS", "")
@@ -31,7 +33,7 @@ def gui_telegram(msg: str) -> bool:
         return False
 
 def chay_robot_nhac_viec():
-    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.4 ---")
+    log.info("--- BẮT ĐẦU CHẠY ROBOT NHẮC VIỆC V3.5 ---")
     driver = None
     ngay_hom_nay = datetime.now() + timedelta(hours=7)
 
@@ -42,12 +44,12 @@ def chay_robot_nhac_viec():
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
         options.add_argument('--ignore-certificate-errors')
-        options.add_argument("--disable-blink-features=AutomationControlled")
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         wait = WebDriverWait(driver, 30)
 
-        driver.get(URL_HE_THONG)
+        # 🚀 Bước 1: Đăng nhập
+        driver.get(URL_DANG_NHAP)
         time.sleep(10)
 
         inputs = driver.find_elements(By.TAG_NAME, "input")
@@ -69,60 +71,64 @@ def chay_robot_nhac_viec():
             driver.execute_script("document.forms[0].submit()")
         time.sleep(15)
 
-        driver.get(URL_HE_THONG)
+        # 🚀 Bước 2: Nhảy thẳng vào URL chứa bảng dữ liệu theo dõi
+        driver.get(URL_BANG_DU_LIEU)
         time.sleep(15)
 
+        # 🚀 Bước 3: Đục thủng lớp bảo vệ Frame nếu có
         driver.switch_to.default_content()
         frames = driver.find_elements(By.TAG_NAME, "frame") or driver.find_elements(By.TAG_NAME, "iframe")
+        
         if frames:
+            # Ưu tiên nhảy vào ô cửa sổ bên phải có tên "Main" hoặc "Right" nơi chứa bảng Excel
             for frame in frames:
-                frame_name = frame.get_attribute("name")
-                if frame_name and frame_name.lower() in ["main", "right"]:
+                f_name = frame.get_attribute("name") or ""
+                if f_name.lower() in ["main", "right", "body"]:
                     driver.switch_to.frame(frame)
+                    log.info(f"Đã nhảy vào frame: {f_name}")
                     break
 
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "tr")))
         rows = driver.find_elements(By.TAG_NAME, "tr")
 
-        log.info(f"📋 Đang quét bảng theo dõi nhiệm vụ...")
+        log.info(f"📋 Tìm thấy {len(rows)} hàng. Đang bốc tách dữ liệu...")
         
+        co_viec_ton = False
         noi_dung_bao_cao = f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 <i>Cập nhật: {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')}</i>\n\n"
-        co_nhiem_vu_ton = False
 
         for row in rows:
             cells = row.find_elements(By.TAG_NAME, "td")
-            
-            # Khớp chính xác số cột của bảng Sở Điện Biên
-            if len(cells) < 10: 
+            if len(cells) < 9: # Chỉ đọc những hàng có đủ cột dữ liệu
                 continue
 
-            # 🎯 Căn chỉnh tọa độ cột chuẩn xác theo ảnh image_7e6c00.png:
-            noi_dung_nhiem_vu = cells[4].text.strip() # Cột 5 (Nội dung chỉ đạo)
-            thoi_han = cells[7].text.strip()          # Cột 8 (Thời hạn xử lý)
-            trang_thai = cells[8].text.strip()        # Cột 9 (Trạng thái)
+            # Căn chỉnh cột chuẩn xác theo ảnh bảng biểu của anh Hoàn
+            noi_dung = cells[4].text.strip() # Cột nội dung chỉ đạo
+            thoi_han = cells[7].text.strip() # Cột thời hạn xử lý
+            trang_thai = cells[8].text.strip() # Cột trạng thái
 
-            # Robot lọc những việc chưa làm
-            if ("chưa thực hiện" in trang_thai.lower()) and noi_dung_nhiem_vu:
-                co_nhiem_vu_ton = True
-                
-                # Cắt ngắn nội dung nếu quá dài để Telegram không bị lỗi
-                nhiem_vu_rut_gon = noi_dung_nhiem_vu.split('\n')[0][:120] 
+            if "chưa thực hiện" in trang_thai.lower() and noi_dung:
+                co_viec_ton = True
+                tieude_rut_gon = noi_dung.split('\n')[0][:150] # Lấy dòng đầu tiên cho gọn tin nhắn
                 
                 noi_dung_bao_cao += (
-                    f"📌 <b>Việc:</b> {nhiem_vu_rut_gon}...\n"
+                    f"📌 <b>Việc:</b> {tieude_rut_gon}...\n"
                     f"⏳ <b>Hạn:</b> 🔴 {thoi_han}\n"
                     f"🚦 <b>TT:</b> {trang_thai}\n"
                     f"─────────────────\n"
                 )
 
-        if co_nhiem_vu_ton:
+        if co_viec_ton:
             gui_telegram(noi_dung_bao_cao)
-            log.info("✅ Đã gửi danh sách việc tồn đọng qua Telegram!")
+            log.info("✅ Đã gửi báo cáo tồn đọng qua Telegram!")
         else:
-            gui_telegram(f"⏰ <b>BẢN TIN GIÁM SÁT NHIỆM VỤ</b>\n📅 {ngay_hom_nay.strftime('%H:%M %d/%m/%Y')}\n\n🎉 Hiện tại không có nhiệm vụ tồn đọng.")
+            # Nếu vẫn không quét được ra việc nào, bắn thẳng mã HTML của trang web ra Telegram để em mổ xẻ cứu hộ!
+            html_debug = driver.page_source[:500]
+            gui_telegram(f"🤖 Robot V3.5 không thấy việc tồn đọng (Debug Web: <code>{html_debug}</code>)")
+            log.info("Không tìm thấy việc.")
 
     except Exception as e:
         log.error(f"❌ Lỗi: {e}")
+        gui_telegram(f"❌ Lỗi Robot: {e}")
     finally:
         if driver:
             driver.quit()
