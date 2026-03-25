@@ -1,0 +1,32 @@
+name: Robot Nhắc Việc UBND Tỉnh
+
+on:
+  schedule:
+    - cron: '0 1 * * 1-5' # Chạy lúc 8:00 sáng từ Thứ 2 đến Thứ 6 (Giờ Việt Nam)
+  workflow_dispatch: # Nút bấm chạy bằng tay bất cứ lúc nào
+
+jobs:
+  run-robot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Tải code về
+      uses: actions/checkout@v4
+
+    - name: Cài đặt Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Cài đặt các thư viện cần thiết
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium webdriver-manager requests
+
+    - name: Kích hoạt Robot quét việc
+      env:
+        SKHCN_USER: ${{ secrets.SKHCN_USER }}
+        SKHCN_PASS: ${{ secrets.SKHCN_PASS }}
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: python robot.py
