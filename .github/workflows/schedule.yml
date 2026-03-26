@@ -4,14 +4,14 @@ on:
   schedule:
     - cron: '30 4 * * *' # Chạy lúc 11:30 Trưa giờ Việt Nam (Tất cả các ngày trong tuần)
     - cron: '30 9 * * *' # Chạy lúc 16:30 Chiều giờ Việt Nam (Tất cả các ngày trong tuần)
-  workflow_dispatch: # Nút bấm chạy bằng tay
+  workflow_dispatch: # Nút bấm chạy bằng tay ngay lập tức trên GitHub
 
 jobs:
   run-robot:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Tải code về
+    - name: Tải code từ kho lưu trữ về máy chủ GitHub
       uses: actions/checkout@v4
 
     - name: Cài đặt Python
@@ -19,15 +19,16 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Cài đặt các thư viện cần thiết
+    - name: Cài đặt các thư viện cần thiết (Bao gồm Google AI Gemini)
       run: |
         python -m pip install --upgrade pip
-        pip install selenium webdriver-manager requests
+        pip install selenium webdriver-manager requests google-genai
 
-    - name: Kích hoạt Robot quét việc
+    - name: Kích hoạt Robot quét việc và Đọc hiểu AI
       env:
         SKHCN_USER: ${{ secrets.SKHCN_USER }}
         SKHCN_PASS: ${{ secrets.SKHCN_PASS }}
         TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # 🎯 Khóa AI anh Hoàn vừa nạp ở bước trước
       run: python robot.py
